@@ -1,6 +1,6 @@
 # Social Spark
 
-An AI agent that turns an idea into a finished social post. It researches the web, drafts in your brand voice, generates an image, **waits for your approval**, and then publishes through Buffer or LinkedIn. It is the running project for the GDG London **Agentic DevCamp**: you build it in Lab 1, run it for real in Lab 2, and lock it down in Lab 3.
+An AI agent that turns an idea into a finished social post. It researches the web, drafts in your brand voice, generates an image, **waits for your approval**, and then publishes through Buffer or LinkedIn. It is the running project for the GDG London **Agentic DevCamp**: you build it in Lab 1, run it for real in Lab 2, lock it down in Lab 3, and optimise it in Lab 4.
 
 > **Start here:** [Setup guide](docs/setup-guide.html) (do this before Saturday) → [Lab 1: Build](docs/lab-1-build.html). All docs are listed in [docs/index.html](docs/index.html).
 >
@@ -36,12 +36,64 @@ You give the **orchestrator** (`social_poster`) an idea. It loads **Agent Skills
 | 1. Build | [Lab 1](docs/lab-1-build.html) | The agent, skills, tools, approval gate, web UI | `pillar-build` |
 | 2. Scale | [Lab 2](docs/lab-2-scale.html) | Deploy to Agent Runtime, managed sessions and Memory Bank | `pillar-scale` |
 | 3. Govern | [Lab 3](docs/lab-3-govern.html) | Model Armor, Cloud DLP, gateway, registry, guardrail evals | `pillar-govern` |
+| 4. Optimise | [Lab 4](docs/lab-4-optimize.html) | Golden evals, simulated users, BigQuery analytics, eval-gated deploys | `pillar-optimize` |
 
 ```bash
 git checkout pillar-build   # for example: the finished result of Lab 1
 ```
 
 <img src="docs/img/architecture-scale.png" alt="Scale: the web UI calls the agent on Agent Runtime, which keeps conversation state in Sessions and long-term facts in Memory Bank" width="800">
+
+## Production Harness & Optimisation Notes
+
+> **Key takeaway:** *Building an agent is easy; harnessing it for production is the hard part.*
+>
+> Notes from the **Optimise workshop with Renuka Kelkar** and **programme wrap notes from Sumith Damodaran**.
+>
+> 📅 **Follow-up session:** **Thursday 22 October (18:00–19:00)** — Optimisation and Q&A.
+
+### The Production Harness
+
+The production harness sits between the user and the agent/tools, handling four essential responsibilities:
+
+1. **Validate In**: Input validation, prompt-injection defense, and ingress safety checks before the model ever sees the prompt.
+2. **Track**: Count tokens, log tool calls, monitor latency, and bound retry loops.
+3. **Validate Out**: Output validation, DLP masking, schema enforcement, and egress guards before results return to the user.
+4. **Report**: Emit structured telemetry, audit trails, and evaluations to BigQuery and Cloud Trace.
+
+### Architecture Demo: The Blog-Writer Agent
+
+Alongside Social Spark, the **blog-writer agent** (root orchestrator, search sub-agent, image sub-agent) illustrates enterprise governance and boundary enforcement:
+- **Model Armor templates in `us-central1`**: Screening user input and model completions against hate speech, harassment, and prompt injection.
+- **Ingress / egress guards**: Validating prompts on entry and generated drafts on exit.
+- **Cloud DLP for sensitive data**: Detecting and redacting PII (phone numbers, credentials, sensitive business data).
+- **Agent Identity before Registry**: Registering authenticated service identities before publishing to Agent Registry.
+- **Access vs. business policies**: Separating network/IAM access controls from high-level agent business rules.
+- **Agent Gateway as the check-post**: Centralized inspection proxy enforcing policy rules across traffic.
+
+### Preferred Cohort Agent Stack: Google ADK + Gemini
+
+For production-grade cohort agents, prefer **Google ADK + Gemini** across all core primitives:
+- **Agents**: Specialized, single-purpose roles.
+- **Tools**: Deterministic interfaces for actions and integrations.
+- **Sessions**: Ephemeral per-turn and conversation tracking.
+- **State & Memory**: Durable context and memory persistence across conversations.
+- **Artifacts**: Reviewable outputs (drafts, reports, code) stored outside prompt context.
+- **Callbacks**: Hooks for lifecycle events, telemetry, and security interventions.
+
+### Key Production & Optimisation Patterns
+
+- **No giant agents**: Never build monolithic agents. Decompose systems into a root orchestrator coordinating focused sub-agents (e.g. search sub-agent, image sub-agent).
+- **Don’t ask AI what code already knows**: Offload deterministic rules, brand guidelines, and constraints to **Skills** and configuration files rather than spending model tokens repeatedly asking the model to discover them.
+- **AI decides / tools execute**: The model handles reasoning and orchestration; deterministic tools perform mutations, database writes, and external API calls.
+- **Dry-run before expensive APIs**: Run dry-runs and validation gates prior to calling paid, rate-limited, or destructive third-party APIs.
+- **Measure every run**: Instrument every turn with telemetry (BigQuery Agent Analytics, Cloud Trace) and guard code changes with automated golden eval sets.
+- **Right-size models**: Use lightweight models (like Gemini Flash) for routing, intent detection, and validation checks; reserve heavier reasoning models only when complex generation is needed.
+- **Shrink context**: Keep context windows lean by stripping conversational bloat and delegating retrieval to tools/sub-agents.
+- **Structured JSON outputs**: Enforce strict schema constraints for tool arguments and structured data responses.
+
+> 💡 **Case study: Cost reduction in practice**  
+> In Renuka’s video-agent experiment, costs reached **~£100 in a single day** before applying these architectural principles. Introducing tool-based stitching, right-sized Flash routing, and context shrinking cut usage sharply down to **~492 tokens** per operation.
 
 ## Run it locally
 
