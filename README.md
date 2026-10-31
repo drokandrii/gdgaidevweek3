@@ -1,4 +1,4 @@
-# Social Spark
+# Blog-writer Agent Optimised
 
 An AI agent that turns an idea into a finished social post. It researches the web, drafts in your brand voice, generates an image, **waits for your approval**, and then publishes through Buffer or LinkedIn. It is the running project for the GDG London **Agentic DevCamp**: you build it in Lab 1, run it for real in Lab 2, lock it down in Lab 3, and optimise it in Lab 4.
 
